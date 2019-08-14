@@ -18,26 +18,11 @@ class Util:
 class Extractor:
     @staticmethod
     def getPixel(image, x, y, transform=None):
-        x, y = int(x), int(y)
-        w, h = image.size
-        if x < 0:
-            iap.log('clamp', "x negative")
-            x = 0
-        elif w - 1 < x:
-            iap.log('clamp', "x above w", "(" + str(x) + ")")
-            x = w - 1
-        if y < 0:
-            iap.log('clamp', "y negative")
-            y = 0
-        elif h - 1 < y:
-            iap.log('clamp', "y above h", "(" + str(y) + ")")
-            y = h - 1
-
         pixel = image.getpixel((x, y))
         return pixel if transform is None else transform(pixel)
 
     @staticmethod
-    def extract(grid, additionalPixelTransform=None):
+    def extractQuadrilateral(grid, additionalPixelTransform=None):
         r = []
 
         w_, h_ = grid.target
@@ -61,11 +46,14 @@ class Extractor:
         vy = lambda p: (1 - p) * va.y + p * vb.y
 
         for j in range(h_):
+            py_ = py(j)
             for i in range(w_):
+                px_ = px(i)
+
                 r.append(Extractor.getPixel(
                     grid.image,
-                    a.x + i*ux(py(j)) + j*vx(py(j)),
-                    a.y + i*uy(px(i)) + j*vy(px(i)),
+                    a.x + i*ux(py_) + j*vx(py_),
+                    a.y + i*uy(px_) + j*vy(px_),
                     additionalPixelTransform
                 ))
 
@@ -82,8 +70,6 @@ class Extractor:
         field = []
         w, h = grid.w - 1, grid.h - 1
         w__, h__ = w_ / w, h_ / h
-        iap.log('debug', "vector field resolution is", w, "by", h, "bases")
-        iap.log('debug', "with each representing", w__, "by", h__)
 
         for i in range(w):
             field.append([])
@@ -102,10 +88,13 @@ class Extractor:
                 field[-1].append([a, (ua, va), (ub, vb)])
 
         for j in range(h_):
+            j_ = j % h__
+            py = j_ / h__
             for i in range(w_):
+                i_ = i % w__
+                px = i_ / w__
+
                 orig, base1, base2 = field[int(i / w__)][int(j / h__)]
-                i_, j_ = i % w__, j % h__
-                px, py = i_ / w__, j_ / h__
 
                 ux = (1 - py) * base1[0].x + py * base2[0].x
                 uy = (1 - px) * base1[0].y + px * base2[0].y
@@ -131,7 +120,7 @@ class Extractor:
         result.putdata(r)
         return result
 
-    # TODO: change method signature to take a `Grid`
+    # TODO: change method signature to take a `Grid` [..?]
     @staticmethod
     def masked(srcImg, srcA, srcB, srcC, srcD, maskColor=(0,0,0)):
         r = []

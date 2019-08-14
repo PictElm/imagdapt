@@ -13,9 +13,11 @@ class Point:
         return f"Point({self.x}, {self.y})"
 
     def __str__(self):
-        return f"({self.x}, {self.y})"
+        return f"({round(self.x, 3)}, {round(self.y, 3)})"
 
     def get(self):
+        """ returns the coordinates as a tuple `(x, y)`
+        """
         return self.x, self.y
 
     @staticmethod
@@ -32,22 +34,30 @@ class Point:
         return Point(x * l, y * l)
 
     @staticmethod
-    def assertIsPoint(value):
+    def assertIsPoint(value, orNone=True):
         """ asserts that `value` is a `Point`
 
             raises a `TypeError` if `value` is not instance of `Point`,
-            otherwise returns it
+            otherwise returns the point
+
+            if `orNone` is true (by default) and `value` is
+            `None`, no error occurs and `None` is returned
         """
-        if not isinstance(value, Point):
+        if orNone:
+            if value is None or isinstance(value, Point):
+                return value
             raise TypeError("Not a Point.")
-        return value
+
+        if isinstance(value, Point):
+            return value
+        raise TypeError("Not a Point.")
 
     @staticmethod
     def asCoordinates(*points):
         """ returns the lists of coordinates of the points
 
             returns two lists `X` and `Y` respectively containing the
-            `.x` and `.y` coordinates of each points (in the order they
+            `.x` and `.y` coordinates of each point (in the order where
             are given)
         """
         X, Y = [], []
@@ -58,7 +68,7 @@ class Point:
 
     @staticmethod
     def between(a, b, ratio=.5):
-        """ returns a new `Point` between `a` and `b`
+        """ returns a new `Point` standing between `a` and `b`
 
             let `c` be the new point; the ratio of the distance from
             `a` to `c` and from `a` to `b` is equal to `ratio`
@@ -82,13 +92,13 @@ class Point:
         return Point(a.x + t * (b.x - a.x), a.y + t * (b.y - a.y))
 
 class Grid:
-    """ a `Grid`  defines a 2-dimentional array of `Point`s
+    """ a `Grid` defines a 2-dimentional array of `Point`s
 
         the minimal size for a grid is 2x2
 
-        a new `Grid` can be provided with all 4 corners as k-args:
+        a new `Grid` can be provided with all 4 corners as kwargs:
         'topRight', 'topLeft', 'bottomRight' and 'bottomLeft'; they
-        must be instances of `Point`
+        must be instances of `Point` (and cannot be `None`)
     """
     def __init__(self, w=2, h=None, **corners):
         self.w = w
@@ -111,7 +121,13 @@ class Grid:
         return f"Grid({self.w}, {self.h})"
 
     def __str__(self):
-        return f"({self.w}x{self.h})"
+        grid = " ],\n\t[ ".join([
+            ", ".join([
+                str(self[i, j])
+            for i in range(self.w)])
+        for j in range(self.h)])
+
+        return f"{self.w}x{self.h}: [\n\t[ {grid} ]\n]"
 
     def __getitem__(self, ij=None):
         if isinstance(ij, int):
@@ -137,12 +153,13 @@ class Grid:
     def setCorners(self, topLeft, topRight, bottomRight, bottomLeft):
         """ sets the corners of the grid
 
-            all parameters must be instances of `Point`
+            all parameters must be instances of `Point` (and cannot be
+            `None`)
         """
-        self.points[0][0] = Point.assertIsPoint(topLeft)
-        self.points[-1][0] = Point.assertIsPoint(topRight)
-        self.points[-1][-1] = Point.assertIsPoint(bottomRight)
-        self.points[0][-1] = Point.assertIsPoint(bottomLeft)
+        self.points[0][0] = Point.assertIsPoint(topLeft, False)
+        self.points[-1][0] = Point.assertIsPoint(topRight, False)
+        self.points[-1][-1] = Point.assertIsPoint(bottomRight, False)
+        self.points[0][-1] = Point.assertIsPoint(bottomLeft, False)
 
         return self
 
@@ -150,8 +167,8 @@ class Grid:
         """ sets the points of one of the border rows
 
             any given parameter must be a list of instances of `Point`
-            and of matching length: the grid's width -2 for `tops` and
-            `bottoms` or grid's height for `lefts` and `rights`
+            and of matching length: the grid's width - 2 for `tops` and
+            `bottoms` or grid's height - 2 for `lefts` and `rights`
         """
         if tops is not None:
             for k in range(1, self.w - 1):
@@ -171,6 +188,7 @@ class Grid:
 
         return self
 
+    # TODO: try to use as many already-set points when aligning
     def complete(self, rows=False, fill=False):
         """ completes the grid with aligned points where missing
 
@@ -179,6 +197,11 @@ class Grid:
                 (see `Grid.setRows`); the added points are placed using
                 the `Point.between` function with the corner points
                 and the ratio of the index and the width or height
+
+                in a future update, the added point will be placed
+                between the closest defined points on the same row
+                (if a point has be set on the row, it will likely be
+                used instead of the corner to produce a straight line))
 
             if `fill` is true:
                 places the missing inner points (i.e. excluding border
@@ -226,6 +249,8 @@ class Grid:
                     for l in self.points))
 
     def getPlotQuad(self, n=0):
+        """ returns the coordinates of the n-inner closed quadrilateral
+        """
         return Point.asCoordinates(
             self.points[n][n],
             self.points[self.w - n - 1][n],
@@ -245,7 +270,7 @@ class Grid:
         )
 
     def bind(self, image, destSize):
-        """ binds an image to the grid to uses extract on
+        """ binds an image to the grid and set the expected result size
         """
         self.target = destSize
         if self.complete():
@@ -254,18 +279,28 @@ class Grid:
         return None
 
     def extract(self, mode=iap.MODE_LINE, transform=None):
-        """ TODO
+        """ apply the extraction algorithm designed by the chosen mode
+
+            `mode` should be one of the value defined by the `imagdapt`
+            module:
+                - `MODE_QUAD`
+                - `MODE_LINE`
+                - `MODE_POLY`
+
+            if a `transform` function is provided, it will be called
+            for each pixel and its result will be applied of the pixel
+            itself
         """
         d = dir(self)
         assert 'image' in d and 'target' in d and self.complete()
 
-        call = {
-            iap.MODE_QUAD: iap.Extractor.extract,
+        calls = {
+            iap.MODE_QUAD: iap.Extractor.extractQuadrilateral,
             iap.MODE_LINE: iap.Extractor.extractLinear,
             iap.MODE_POLY: iap.Extractor.extractPolynomial
         }
 
-        d = {}
-        r = iap.time(lambda: call[mode](self, transform), d)
-        iap.log('extract', "operation took", d['time'], "ns")
+        timingResult = {}
+        r = iap.time(lambda: calls[mode](self, transform), timingResult)
+        iap.log('extract', "operation took", timingResult['time'] / 1e9, "s")
         return r

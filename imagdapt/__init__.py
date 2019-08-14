@@ -1,23 +1,73 @@
-"""
-        A------------------B
-        |                  |
-        |                  |
-        |                  |
-        D------------------C
+""" A module providing tools to extract parts of an image.
+
+
+Overview:
+---------
+
+    This module defines a `Point` object and `Grid` object made of an
+    array of points.
+
+    Once a `Grid` has been instantiated, it can be bound to a
+    `PIL.Image` while also providing a destination size. After that,
+    various extraction tools can be used to extract the part of the
+    image defined by the grid.
+
+    The resulting image is a flatten perspective of the part, mapped to
+    a rectangle according to the grid, of size the destination size
+    provided when binding the grid.
+
+    For a result example, use the command `python -m imagdapt test`.
+    For a code example, see in `__main__.py`.
+
+Extraction modes:
+-----------------
+
+    This module defines 3 extraction strategies:
+
+        1. `MODE_QUAD` - quadrilateral extraction:
+            only uses the four corners of the grid; the shape hence
+            defined is a quadrilateral
+
+        2. `MODE_LINE` - linear extraction:
+            proceed to extract each cell of the grid as quadrilaterals;
+            in the result, all cells takes up the same size
+
+        3. `MODE_POLY` - polynomial extraction:
+            TODO: extracts using continuous functions across the grid
+            to avoid the slicing that occur with the linear mode
+
+Hum:
+----
+
+        .-----------------------------------------------------.
+        |                                                     |
+        |                                                     |
+        |                             __..---^B               |
+        |                  A.----^"'"`        |               |
+        |                   \\          =)     |               |
+        |                    \\                |               |
+        |                     D----...__      |               |
+        |                               `'"^--C               |
+        '-----------------------------------------------------'
+
+                A---------------------------------B
+                |                                 |
+                |                _   \\            |
+                |                _    |           |
+                |                    /            |
+                |                                 |
+                D---------------------------------C
 """
 
 from time import time_ns
 
-def log(tag, *text):
-    """ logs to stdout
+def log(tag, *elm):
+    """ logs data to stdout
 
-        format is: `[{tag}]: {text}
-
-        elements are separated by spaces
-
-        ends with a new line
+        format is: `"[{tag}]: {elm}\\n"` with elements of `elm`
+        separated by spaces
     """
-    print("[" + tag + "]:", *text)
+    print("[" + tag + "]:", *elm)
 
 def time(task, result):
     """ times the given task using the built-in `time.time_ns`
