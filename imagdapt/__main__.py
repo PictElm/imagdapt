@@ -1,7 +1,7 @@
 """ test with `"python -m imagdapt [test_name]"`
 
-    available tests can be found as the keys of the `location`
-    dictionary
+    available tests can be found as the keys of the `locations`
+    dictionary below
 """
 
 import imagdapt as iap

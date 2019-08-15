@@ -2,27 +2,36 @@ import imagdapt as iap
 from PIL import Image
 
 class Util:
+    """ static util class
+    """
     @staticmethod
     def openImage(fp, mode='r', **kw):
+        """ opens and returns an image
+
+            this function simply calls `Image.open`
+        """
         return Image.open(fp, mode, **kw)
 
     @staticmethod
     def newImage(mode, size, color=0, **kw):
-        return Image.new(mode, size, color, **kw)
+        """ creates and returns a new image
 
-    @staticmethod
-    def normVec(x, y, s):
-        l = (x * x + y * y)**.5 / s
-        return x / l, y / l
+            this function simply calls `Image.new`
+        """
+        return Image.new(mode, size, color, **kw)
 
 class Extractor:
     @staticmethod
     def getPixel(image, x, y, transform=None):
+        """ gets the pixel and applies the transform if not `None`
+        """
         pixel = image.getpixel((x, y))
         return pixel if transform is None else transform(pixel)
 
     @staticmethod
     def extractQuadrilateral(grid, additionalPixelTransform=None):
+        """ extraction algorithm for the `MODE_QUAD` mode
+        """
         r = []
 
         w_, h_ = grid.target
@@ -63,6 +72,8 @@ class Extractor:
 
     @staticmethod
     def extractLinear(grid, additionalPixelTransform=None):
+        """ extraction algorithm for the `MODE_LINE` mode
+        """
         r = []
 
         w_, h_ = grid.target
@@ -114,15 +125,23 @@ class Extractor:
 
     @staticmethod
     def extractPolynomial(grid, additionalPixelTransform=None):
+        """ (TODO) extraction algorithm for the `MODE_POLY` mode
+        """
         r = []
 
         result = Util.newImage(grid.image.mode, grid.target)
         result.putdata(r)
         return result
 
-    # TODO: change method signature to take a `Grid` [..?]
     @staticmethod
     def masked(srcImg, srcA, srcB, srcC, srcD, maskColor=(0,0,0)):
+        """ (unused - TODO: keep and adapt or remove because useless?)
+
+            this function returns an image where only the part within
+            the quadrilateral defined by `srcA`, `srcB` `srcC` and
+            `srcD` from the `srcImg` is visible; the exterior is
+            replaced with the `maskColor` (an RGB-tuple pixel)
+        """
         r = []
 
         w, h = srcImg.size

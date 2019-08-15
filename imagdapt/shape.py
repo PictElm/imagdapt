@@ -10,9 +10,16 @@ class Point:
         self.y = y
 
     def __repr__(self):
+        """ returns `"Point({x}, {y})"`
+        """
         return f"Point({self.x}, {self.y})"
 
     def __str__(self):
+        """ produce a string representation of the point
+
+            ```
+                ({x.3f}, {y.3f})
+        """
         return f"({round(self.x, 3)}, {round(self.y, 3)})"
 
     def get(self):
@@ -118,9 +125,20 @@ class Grid:
             )
 
     def __repr__(self):
+        """ returns `"Grid({w}, {h})"`
+        """
         return f"Grid({self.w}, {self.h})"
 
     def __str__(self):
+        """ produce a string representation of the full grid
+
+            ```
+                {w}x{h}: [
+                    [ {points[0, 0]}, .. ],
+                    [ .. ]
+                ]
+            ```
+        """
         grid = " ],\n\t[ ".join([
             ", ".join([
                 str(self[i, j])
@@ -130,11 +148,29 @@ class Grid:
         return f"{self.w}x{self.h}: [\n\t[ {grid} ]\n]"
 
     def __getitem__(self, ij=None):
+        """ gets the point at (i, j) with `i, j = ij`
+
+            if `ij` is `None`, returns the entire grid of points
+
+            if `ij` is an integer, returns the corresponding column so
+            that both calls produce the same output:
+            ```python
+                print(grid[i, j])
+                print(grid[i][j])
+            ```
+        """
+        if ij is None:
+            return self.points
         if isinstance(ij, int):
             return self.points[ij]
         return self.points if ij is None else self.points[ij[0]][ij[1]]
 
-    def __setitem__(self, ij=None, value=[]):
+    def __setitem__(self, ij=None, value=None):
+        """ sets `value` at (i, j), with `i, j = ij`
+
+            if `ij` is `None` and `value` is a table the same size
+            as the gide, updates the entire grid with the given points
+        """
         if ij is None:
             if len(value) != self.w or len(value[0]) != self.h:
                 raise IndexError(
@@ -148,6 +184,10 @@ class Grid:
             self.points[ij[0]][ij[1]] = Point.assertIsPoint(value)
 
     def __len__(self):
+        """ returns the smallest dimensions of the grid
+
+            min of its width and height
+        """
         return min(self.w, self.h)
 
     def setCorners(self, topLeft, topRight, bottomRight, bottomLeft):
@@ -195,43 +235,60 @@ class Grid:
             if `rows` is true:
                 places the missing points for each of the border rows
                 (see `Grid.setRows`); the added points are placed using
-                the `Point.between` function with the corner points
-                and the ratio of the index and the width or height
-
-                in a future update, the added point will be placed
-                between the closest defined points on the same row
-                (if a point has be set on the row, it will likely be
-                used instead of the corner to produce a straight line))
+                the `Point.between` function with the the closest
+                defined (i.e. non-`None`) points on the same row: if a
+                point has be set on the row, it will likely be used
+                instead of the corner to ensure a straight line (I hope
+                you get the point...)
 
             if `fill` is true:
                 places the missing inner points (i.e. excluding border
                 rows and corners); the added points are placed using
                 the `Point.intersect` function with the corresponding
-                points from each of the border rows
+                points from the border rows
 
             returns `True` if the grid is completed i.e. every element
             is a valid instance of `Point`
         """
         if rows:
-            def p(ia, ja, ib, jb, r):
-                pa, pb = self.points[ia][ja], self.points[ib][jb]
-                return Point.between(pa, pb, r)
+            def g(i, j, di, dj):
+                """
+                (i_, j_) of first non-`None` points starting from
+                (i, j) and moving by (di, dj)
+                """
+                i+= di
+                j+= dj
+                while self[i, j] is None:
+                    i+= di
+                    j+= dj
+                return i, j
+
+            def p(i, j, di, dj):
+                """
+                point between the first non-`None` from (i, j)
+                moving by (di, dj) and the first non-`None` from
+                (i, j) moving by (-di, -dj)
+                """
+                ija, ijb = g(i, j, di, dj), g(i, j, -di, -dj)
+                if di:
+                    r = abs(ija[0] - i) / abs(ija[0] - ijb[0])
+                else:
+                    r = abs(ija[1] - j) / abs(ija[1] - ijb[1])
+                return Point.between(self[ija], self[ijb], r)
 
             for k in range(1, self.w - 1):
                 if not self.points[k][0]:
-                    self.points[k][0] = p(0, 0, -1, 0, k / (self.w-1))
+                    self.points[k][0] = p(k, 0, 1, 0)
 
-            for k in range(1, self.h - 1):
-                if not self.points[-1][k]:
-                    self.points[-1][k] = p(-1, 0, -1, -1, k / (self.h-1))
-
-            for k in range(1, self.w - 1):
                 if not self.points[k][-1]:
-                    self.points[k][-1] = p(0, -1, -1, -1, k / (self.w-1))
+                    self.points[k][-1] = p(k, -1, 1, 0)
 
             for k in range(1, self.h - 1):
                 if not self.points[0][k]:
-                    self.points[0][k] = p(0, 0, 0, -1, k / (self.h-1))
+                    self.points[0][k] = p(0, k, 0, 1)
+
+                if not self.points[-1][k]:
+                    self.points[-1][k] = p(-1, k, 0, 1)
 
         if fill:
             def q(i, j):
@@ -263,10 +320,10 @@ class Grid:
         """ returns the coordinates of the n-inner closed shape
         """
         return Point.asCoordinates(
-            *([self.points[l][n] for l in range(n, self.w - n)]
-            + [self.points[self.w - n - 1][l] for l in range(n + 1, self.h - n)]
-            + [self.points[l][self.h - n - 1] for l in range(self.w - 2 - n, n - 1, -1)]
-            + [self.points[n][l] for l in range(self.h - 2 - n, n - 1, -1)])
+            *([self.points[l][n] for l in range(n, self.w-n)]
+            + [self.points[self.w-n-1][l] for l in range(n+1, self.h-n)]
+            + [self.points[l][self.h-n-1] for l in range(self.w-2-n, n-1, -1)]
+            + [self.points[n][l] for l in range(self.h-2-n, n-1, -1)])
         )
 
     def bind(self, image, destSize):
@@ -288,8 +345,8 @@ class Grid:
                 - `MODE_POLY`
 
             if a `transform` function is provided, it will be called
-            for each pixel and its result will be applied of the pixel
-            itself
+            for each pixel and its result will be applied instead of
+            the pixel itself
         """
         d = dir(self)
         assert 'image' in d and 'target' in d and self.complete()
